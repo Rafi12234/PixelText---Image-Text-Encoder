@@ -332,13 +332,19 @@ class _HomePageState extends State<HomePage>
   final ScrollController _scrollController = ScrollController();
 
   Uint8List? _previewBytes;
+  Uint8List? _originalBytes;
   String? _fileName;
+  String? _originalName;
+  String? _originalExtension;
   String? _generatedText;
   String? _statusMessage;
   bool _isBusy = false;
   bool _isSuccess = false;
   bool _showCopiedBadge = false;
   int _liveCharCount = 0;
+  int _imageQualityPercent = 100;
+  int _imageSizePercent = 100;
+  Timer? _previewDebounce;
 
   late final AnimationController _pulseController;
   late final AnimationController _fadeController;
@@ -380,6 +386,7 @@ class _HomePageState extends State<HomePage>
 
   @override
   void dispose() {
+    _previewDebounce?.cancel();
     _pulseController.dispose();
     _fadeController.dispose();
     _slideController.dispose();
@@ -403,6 +410,9 @@ class _HomePageState extends State<HomePage>
   void _resetAll() {
     setState(() {
       _previewBytes = null;
+      _originalBytes = null;
+      _originalName = null;
+      _originalExtension = null;
       _fileName = null;
       _generatedText = null;
       _statusMessage = 'Workspace refreshed. Ready for a new image.';
@@ -432,46 +442,127 @@ class _HomePageState extends State<HomePage>
       }
 
       final file = result.files.single;
-      final bytes = file.bytes;
-      if (bytes == null || bytes.isEmpty) {
+      final originalBytes = file.bytes;
+      if (originalBytes == null || originalBytes.isEmpty) {
         setState(() => _isBusy = false);
         _setStatus('Failed to read file.');
         return;
       }
 
+      // Keep original bytes so slider changes can re-generate previews.
+      _originalBytes = originalBytes;
+      _originalName = file.name;
+      _originalExtension = file.extension;
+
+      final prepared = _prepareImageForEncoding(
+        originalBytes: originalBytes,
+        originalName: file.name,
+        extension: file.extension,
+      );
+      final encodedBytes = prepared['bytes'] as Uint8List;
+      final encodedName = prepared['name'] as String;
+      final encodedMime = prepared['mime'] as String;
+
       final payload = <String, dynamic>{
         'version': 1,
-        'name': file.name,
-        'mime': _guessMimeType(file.extension),
-        'data': base64Encode(bytes),
+        'name': encodedName,
+        'mime': encodedMime,
+        'data': base64Encode(encodedBytes),
       };
       final encodedText = jsonEncode(payload);
 
-      if (encodedText.length > kMaxEncodedChars) {
-        setState(() => _isBusy = false);
-        _showCompressionDialog(
-          originalBytes: bytes,
-          fileName: file.name,
-          fileExtension: file.extension ?? 'unknown',
-          originalEncodedLength: encodedText.length,
-        );
-        return;
-      }
-
       setState(() {
-        _previewBytes = bytes;
-        _fileName = file.name;
+        _previewBytes = encodedBytes;
+        _fileName = encodedName;
         _generatedText = encodedText;
         _textController.text = encodedText;
         _liveCharCount = encodedText.length;
         _isBusy = false;
       });
-      _setStatus('Image encoded — ${encodedText.length} characters.', success: true);
+      _setStatus(
+        'Image encoded - ${encodedText.length} chars (quality ${_imageQualityPercent}%, size ${_imageSizePercent}%).',
+        success: true,
+      );
       _animateIn();
     } catch (e) {
       setState(() => _isBusy = false);
       _setStatus('Error: $e');
     }
+  }
+
+  void _queuePreviewUpdate() {
+    _previewDebounce?.cancel();
+    _previewDebounce = Timer(const Duration(milliseconds: 180), () {
+      _regeneratePreviewFromOriginal();
+    });
+  }
+
+  void _onQualityChanged(int value) {
+    setState(() => _imageQualityPercent = value);
+    _queuePreviewUpdate();
+  }
+
+  void _onSizeChanged(int value) {
+    setState(() => _imageSizePercent = value);
+    _queuePreviewUpdate();
+  }
+
+  Future<void> _regeneratePreviewFromOriginal() async {
+    final original = _originalBytes;
+    final name = _originalName;
+    final ext = _originalExtension;
+    if (original == null || name == null) return;
+    setState(() {
+      _isBusy = true;
+      _statusMessage = null;
+    });
+    try {
+      await Future.delayed(const Duration(milliseconds: 8));
+      final prepared = _prepareImageForEncoding(
+        originalBytes: original,
+        originalName: name,
+        extension: ext,
+      );
+      final encodedBytes = prepared['bytes'] as Uint8List;
+      final encodedName = prepared['name'] as String;
+      final encodedMime = prepared['mime'] as String;
+
+      final payload = <String, dynamic>{
+        'version': 1,
+        'name': encodedName,
+        'mime': encodedMime,
+        'data': base64Encode(encodedBytes),
+      };
+      final encodedText = jsonEncode(payload);
+
+      if (!mounted) return;
+      setState(() {
+        _previewBytes = encodedBytes;
+        _fileName = encodedName;
+        _generatedText = encodedText;
+        _textController.text = encodedText;
+        _liveCharCount = encodedText.length;
+        _isBusy = false;
+      });
+      _setStatus(
+        'Preview updated - ${encodedText.length} chars (quality ${_imageQualityPercent}%, size ${_imageSizePercent}%).',
+        success: true,
+      );
+      _animateIn();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isBusy = false);
+      _setStatus('Preview update failed: $e');
+    }
+  }
+
+  List<String> _splitTextIntoBlocks(String text, int blockSize) {
+    final List<String> out = [];
+    for (var i = 0; i < text.length; i += blockSize) {
+      final end = (i + blockSize < text.length) ? i + blockSize : text.length;
+      out.add(text.substring(i, end));
+    }
+    return out;
   }
 
   // ── Compression ─────────────────────────────────────────────────────────────
@@ -691,6 +782,57 @@ class _HomePageState extends State<HomePage>
     return buf.toString();
   }
 
+  Map<String, dynamic> _prepareImageForEncoding({
+    required Uint8List originalBytes,
+    required String originalName,
+    required String? extension,
+  }) {
+    final int qualityPercent = _imageQualityPercent.clamp(0, 100).toInt();
+    final int sizePercent = _imageSizePercent.clamp(1, 100).toInt();
+    final bool shouldTransform = qualityPercent < 100 || sizePercent < 100;
+
+    if (!shouldTransform) {
+      return {
+        'bytes': originalBytes,
+        'name': originalName,
+        'mime': _guessMimeType(extension),
+      };
+    }
+
+    final decoded = img.decodeImage(originalBytes);
+    if (decoded == null) {
+      return {
+        'bytes': originalBytes,
+        'name': originalName,
+        'mime': _guessMimeType(extension),
+      };
+    }
+
+    img.Image working = img.bakeOrientation(decoded);
+    if (sizePercent < 100) {
+      final double scale = sizePercent / 100.0;
+      final int width = (working.width * scale).round().clamp(1, working.width);
+      final int height = (working.height * scale).round().clamp(1, working.height);
+      working = img.copyResize(
+        working,
+        width: width,
+        height: height,
+        interpolation: img.Interpolation.linear,
+      );
+    }
+
+    final transformedBytes = Uint8List.fromList(
+      img.encodeJpg(working, quality: qualityPercent),
+    );
+    final baseName = originalName.replaceAll(RegExp(r'\.[^.]+$'), '');
+
+    return {
+      'bytes': transformedBytes,
+      'name': '${baseName}_q${qualityPercent}_s${sizePercent}.jpg',
+      'mime': 'image/jpeg',
+    };
+  }
+
   Uint8List _decodeImageBytes(String input) {
     return base64Decode(_normalizeEncodedText(input));
   }
@@ -821,6 +963,14 @@ class _HomePageState extends State<HomePage>
                               onRefresh: _resetAll,
                               showCopied: _showCopiedBadge,
                             ),
+                            const SizedBox(height: 18),
+                            _EncodingControlsCard(
+                              isBusy: _isBusy,
+                              qualityPercent: _imageQualityPercent,
+                              sizePercent: _imageSizePercent,
+                              onQualityChanged: (value) => _onQualityChanged(value),
+                              onSizeChanged: (value) => _onSizeChanged(value),
+                            ),
                             const SizedBox(height: 28),
                             _StatusBar(
                               message: _statusMessage,
@@ -836,9 +986,22 @@ class _HomePageState extends State<HomePage>
                                 fadeAnim: _fadeAnim,
                                 slideAnim: _slideAnim,
                               );
+                              final fullText = (_generatedText ?? _textController.text).trim();
+                              final blocks = fullText.length > kMaxEncodedChars
+                                  ? _splitTextIntoBlocks(fullText, kMaxEncodedChars)
+                                  : <String>[];
+
                               final textPanel = _TextEditorCard(
                                 controller: _textController,
                                 charCount: _liveCharCount,
+                                splitBlocks: blocks,
+                                onCopyBlock: (index) {
+                                  final block = blocks[index];
+                                  Clipboard.setData(ClipboardData(text: block));
+                                  setState(() => _showCopiedBadge = true);
+                                  Future.delayed(const Duration(seconds: 2),
+                                      () => setState(() => _showCopiedBadge = false));
+                                },
                                 onChanged: (value) {
                                   setState(() {
                                     _liveCharCount = value.length;
@@ -855,7 +1018,15 @@ class _HomePageState extends State<HomePage>
                                     crossAxisAlignment:
                                         CrossAxisAlignment.stretch,
                                     children: [
-                                      Expanded(child: imgPanel),
+                                      Expanded(
+                                        child: Column(
+                                          children: [
+                                            imgPanel,
+                                            const SizedBox(height: 12),
+                                            const _BlockSendingInstructions(),
+                                          ],
+                                        ),
+                                      ),
                                       const SizedBox(width: 20),
                                       Expanded(child: textPanel),
                                     ],
@@ -864,6 +1035,8 @@ class _HomePageState extends State<HomePage>
                               }
                               return Column(children: [
                                 imgPanel,
+                                const SizedBox(height: 12),
+                                const _BlockSendingInstructions(),
                                 const SizedBox(height: 20),
                                 textPanel,
                               ]);
@@ -1256,9 +1429,7 @@ class _StatusBar extends StatelessWidget {
                 _StatChip(
                   icon: Icons.text_fields_rounded,
                   label: '$textLength chars',
-                  color: textLength > kMaxEncodedChars
-                      ? AppColors.danger
-                      : AppColors.accentAlt,
+                  color: AppColors.accentAlt,
                 ),
                 _StatChip(
                   icon: Icons.insert_drive_file_rounded,
@@ -1521,22 +1692,23 @@ class _TextEditorCard extends StatelessWidget {
     required this.controller,
     required this.charCount,
     required this.onChanged,
+    this.splitBlocks,
+    this.onCopyBlock,
   });
 
   final TextEditingController controller;
   final int charCount;
   final ValueChanged<String> onChanged;
+  final List<String>? splitBlocks;
+  final ValueChanged<int>? onCopyBlock;
 
   @override
   Widget build(BuildContext context) {
-    final over = charCount > kMaxEncodedChars;
     return Container(
       decoration: BoxDecoration(
         color: AppColors.card,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: over ? AppColors.danger.withValues(alpha: 0.5) : AppColors.border,
-        ),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1562,17 +1734,13 @@ class _TextEditorCard extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: over
-                        ? AppColors.danger.withValues(alpha: 0.15)
-                        : AppColors.accentAlt.withValues(alpha: 0.12),
+                    color: AppColors.accentAlt.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    over
-                        ? '⚠ $charCount / $kMaxEncodedChars'
-                        : '$charCount chars',
+                    '$charCount chars',
                     style: TextStyle(
-                      color: over ? AppColors.danger : AppColors.accentAlt,
+                      color: AppColors.accentAlt,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1612,6 +1780,66 @@ class _TextEditorCard extends StatelessWidget {
               ),
             ),
           ),
+          if (splitBlocks != null && splitBlocks!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < splitBlocks!.length; i++)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              Text('Block ${i + 1}',
+                                  style: const TextStyle(
+                                      color: AppColors.accentAlt,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700)),
+                              const Spacer(),
+                              Text('${splitBlocks![i].length} chars',
+                                  style: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 12)),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                                icon: const Icon(Icons.copy_rounded,
+                                    size: 18, color: AppColors.accentAlt),
+                                onPressed: onCopyBlock == null
+                                    ? null
+                                    : () => onCopyBlock!(i),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SelectableText(
+                            splitBlocks![i],
+                            style: const TextStyle(
+                              color: AppColors.textPrimary,
+                              fontSize: 11,
+                              fontFamily: 'monospace',
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -2328,6 +2556,189 @@ class _SheetButtonState extends State<_SheetButton>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _EncodingControlsCard extends StatelessWidget {
+  const _EncodingControlsCard({
+    required this.isBusy,
+    required this.qualityPercent,
+    required this.sizePercent,
+    required this.onQualityChanged,
+    required this.onSizeChanged,
+  });
+
+  final bool isBusy;
+  final int qualityPercent;
+  final int sizePercent;
+  final ValueChanged<int> onQualityChanged;
+  final ValueChanged<int> onSizeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.tune_rounded, size: 16, color: AppColors.accentAlt),
+              SizedBox(width: 8),
+              Text(
+                'Manual Encode Controls',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Lower quality or size to reduce encoded text character count.',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+          ),
+          const SizedBox(height: 14),
+          _SliderRow(
+            label: 'Image Quality',
+            valueText: '$qualityPercent%',
+            min: 0,
+            max: 100,
+            divisions: 100,
+            value: qualityPercent.toDouble(),
+            enabled: !isBusy,
+            onChanged: (v) => onQualityChanged(v.round()),
+          ),
+          const SizedBox(height: 8),
+          _SliderRow(
+            label: 'Image Size',
+            valueText: '$sizePercent%',
+            min: 1,
+            max: 100,
+            divisions: 99,
+            value: sizePercent.toDouble(),
+            enabled: !isBusy,
+            onChanged: (v) => onSizeChanged(v.round()),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SliderRow extends StatelessWidget {
+  const _SliderRow({
+    required this.label,
+    required this.valueText,
+    required this.min,
+    required this.max,
+    required this.divisions,
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String valueText;
+  final double min;
+  final double max;
+  final int divisions;
+  final double value;
+  final bool enabled;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              valueText,
+              style: const TextStyle(
+                color: AppColors.accentAlt,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: AppColors.accentAlt,
+            inactiveTrackColor: AppColors.border,
+            thumbColor: AppColors.accentAlt,
+            overlayColor: AppColors.accentAlt.withValues(alpha: 0.15),
+            trackHeight: 3,
+          ),
+          child: Slider(
+            min: min,
+            max: max,
+            divisions: divisions,
+            value: value,
+            label: valueText,
+            onChanged: enabled ? onChanged : null,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Block Sending Instructions ─────────────────────────────────────────────
+class _BlockSendingInstructions extends StatelessWidget {
+  const _BlockSendingInstructions();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.symmetric(horizontal: 0),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: const [
+          Text('How to send encoded text in messenger:',
+              style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700)),
+          SizedBox(height: 8),
+          Text('• The app splits the full encoded JSON into blocks of up to 5,000 characters each.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          SizedBox(height: 6),
+          Text('• Label each block with its index (e.g. "Block 2/6") so the receiver can reassemble in order.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          SizedBox(height: 6),
+          Text('• Use the copy icon for each block and paste/send them sequentially (1 → 2 → 3 …).',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+          SizedBox(height: 6),
+          Text('• After changing sliders, the blocks are re-generated — re-copy & resend the updated blocks.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+        ],
       ),
     );
   }
