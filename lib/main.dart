@@ -1118,6 +1118,7 @@ class _TopBar extends StatelessWidget {
               color: AppColors.accent,
             ),
           ),
+        
       ],
     );
   }
@@ -1143,6 +1144,7 @@ class _HeroBanner extends StatelessWidget {
   final VoidCallback onDecode;
   final VoidCallback onCopy;
   final VoidCallback onSavePdf;
+  
   final VoidCallback onDownloadImage;
   final VoidCallback onRefresh;
   final bool showCopied;
@@ -1159,6 +1161,7 @@ class _HeroBanner extends StatelessWidget {
           BoxShadow(
             color: AppColors.accent.withValues(alpha: 0.08),
             blurRadius: 40,
+            
             spreadRadius: 0,
           ),
         ],
@@ -1166,6 +1169,7 @@ class _HeroBanner extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          
           // Title row
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
