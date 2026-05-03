@@ -123,6 +123,7 @@ Map<String, dynamic> _runCompressionCore({
     Uint8List? scaleBestBytes;
     int? scaleBestLen;
     int? scaleBestQuality;
+    
 
     // Adaptive quality search: find highest quality that still fits.
     var low = minQuality;
@@ -177,6 +178,7 @@ Map<String, dynamic> _runCompressionCore({
         bestReadableWidth = width;
         bestReadableHeight = height;
         bestReadableQuality = scaleBestQuality;
+        
       }
 
       // Good enough candidate reached: stop expensive further search.
