@@ -385,6 +385,7 @@ class _HomePageState extends State<HomePage>
       end: Offset.zero,
     ).animate(
       CurvedAnimation(parent: _slideController, curve: Curves.easeOutCubic),
+      
     );
   }
 
