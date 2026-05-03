@@ -2,14 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:async';
 import 'dart:isolate';
-
 import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdf/widgets.dart' as pw;
 
+
 const int kMaxEncodedChars = 5000;
+
 
 int _encodedLengthFor(Uint8List bytes, String fileName, String mimeType) {
   final payload = <String, dynamic>{
