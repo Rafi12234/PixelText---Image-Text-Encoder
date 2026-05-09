@@ -86,6 +86,7 @@ Map<String, dynamic> _runCompressionCore({
     0.10,
     0.08,
     0.06,
+    
   ];
   const minQuality = 18;
   const maxQuality = 92;
