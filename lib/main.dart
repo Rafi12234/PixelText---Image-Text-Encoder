@@ -67,7 +67,7 @@ Map<String, dynamic> _runCompressionCore({
   int? bestReadableWidth;
   int? bestReadableHeight;
   int? bestReadableQuality;
-  double bestReadableScore = -1;
+  double bestReadableScore =  -1;
 
   const scales = <double>[
     1.00,
