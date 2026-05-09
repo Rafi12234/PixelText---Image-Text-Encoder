@@ -38,6 +38,7 @@ Map<String, dynamic> _runCompressionCore({
   const compressedMime = 'image/jpeg';
   final decoded = img.decodeImage(originalBytes);
   if (decoded == null) {
+    
     final fallback = Uint8List.fromList(
         img.encodeJpg(img.Image(width: 1, height: 1), quality: 1));
     return {
