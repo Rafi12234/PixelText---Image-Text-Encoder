@@ -163,7 +163,7 @@ Map<String, dynamic> _runCompressionCore({
 
     if (scaleBestBytes != null && scaleBestLen != null && scaleBestQuality != null) {
       final areaRatio = (width * height) / originalArea;
-      final sideRatio = minOriginalSide <= 0 ? 0.0 : (minSide / minOriginalSide);
+      final sideRatio = minOriginalSide <= 0  ? 0.0 : (minSide / minOriginalSide);
       final qualityRatio = scaleBestQuality / 100.0;
       final qualityPower = qualityRatio * qualityRatio;
       final utilization = scaleBestLen / kMaxEncodedChars;
@@ -185,7 +185,7 @@ Map<String, dynamic> _runCompressionCore({
       }
 
       // Good enough candidate reached: stop expensive further search.
-      if (sideRatio >= 0.45 && qualityRatio >= 0.45 && utilization >= 0.95) {
+      if (sideRatio >= 0.45  && qualityRatio >= 0.45 && utilization >= 0.95) {
         shouldStopEarly = true;
       }
     }
