@@ -15,6 +15,7 @@ const int kMaxEncodedChars = 5000;
 
 int _encodedLengthFor(Uint8List bytes, String fileName, String mimeType) {
   final payload = <String, dynamic>{
+    
     'version': 1,
     'name': fileName,
     'mime': mimeType,
