@@ -630,7 +630,7 @@ class _HomePageState extends State<HomePage>
       _statusMessage = null;
     });
     try {
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds:  300));
       final bytes = _decodeImageBytes(input);
       final name = _extractName(input);
       setState(() {
