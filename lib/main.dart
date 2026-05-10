@@ -10,7 +10,7 @@ import 'package:image/image.dart' as  img;
 import 'package:pdf/widgets.dart' as pw;
 
 
-const int kMaxEncodedChars = 5000;
+const int kMaxEncodedChars =  5000;
 
 
 int _encodedLengthFor(Uint8List bytes, String fileName, String mimeType) {
