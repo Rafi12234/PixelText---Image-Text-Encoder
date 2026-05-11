@@ -904,6 +904,8 @@ class _HomePageState extends State<HomePage>
 
   String _guessMimeType(String? ext) {
     switch (ext?.toLowerCase()) {
+
+        
       case 'jpg':
       case 'jpeg':
         return 'image/jpeg';
