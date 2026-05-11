@@ -179,6 +179,7 @@ Map<String, dynamic> _runCompressionCore({
         bestReadableScore = score;
         bestReadableBytes = scaleBestBytes;
         bestReadableLen = scaleBestLen;
+        
         bestReadableWidth = width;
         bestReadableHeight = height;
         bestReadableQuality = scaleBestQuality;
