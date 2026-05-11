@@ -469,7 +469,7 @@ class _HomePageState extends State<HomePage>
         originalName: file.name,
         extension: file.extension,
       );
-      final encodedBytes = prepared['bytes'] as Uint8List;
+      final encodedBytes = prepared['bytes']  as Uint8List;
       final encodedName = prepared['name'] as String;
       final encodedMime = prepared['mime'] as String;
 
