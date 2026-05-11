@@ -10,6 +10,7 @@ import 'package:image/image.dart' as  img;
 import 'package:pdf/widgets.dart' as pw;
 
 
+
 const int kMaxEncodedChars =  5000;
 
 
