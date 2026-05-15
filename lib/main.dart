@@ -208,7 +208,7 @@ Map<String, dynamic> _runCompressionCore({
 
   // Additional readability-oriented fallback: prioritize keeping JPEG quality
   // higher by reducing dimensions first.
-  const targetMaxSides = <int>[240, 200, 168, 140, 118, 98, 82, 68, 56, 44, 32, 24, 16, 12, 8, 4, 2, 1];
+  const targetMaxSides = <int>[240, 200,  168, 140, 118, 98, 82, 68, 56, 44, 32, 24, 16, 12, 8, 4, 2, 1];
   const fallbackQualities = <int>[24, 20, 16, 12, 10, 8, 6, 4, 2, 1];
 
   for (final maxSide in targetMaxSides) {
