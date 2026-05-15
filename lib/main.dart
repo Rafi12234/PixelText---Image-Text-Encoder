@@ -44,6 +44,7 @@ Map<String, dynamic> _runCompressionCore({
     final fallback = Uint8List.fromList(
         img.encodeJpg(img.Image(width: 1, height: 1), quality: 1));
     return {
+      
       'compressedBytes': fallback,
       'compressedEncodedLength':
           _encodedLengthFor(fallback, compressedName, compressedMime),
