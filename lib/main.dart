@@ -420,7 +420,7 @@ class _HomePageState extends State<HomePage>
 
   void _resetAll() {
     setState(() {
-      _previewBytes = null;
+      _previewBytes =null;
       _originalBytes = null;
       _originalName = null;
       _originalExtension = null;
