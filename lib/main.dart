@@ -63,7 +63,7 @@ Map<String, dynamic> _runCompressionCore({
   int smallestLen = _encodedLengthFor(smallestBytes, compressedName, compressedMime);
   int smallestWidth = source.width;
   int smallestHeight = source.height;
-  int smallestQuality = 70;
+  int smallestQuality =  70;
 
   Uint8List? bestReadableBytes;
   int? bestReadableLen;
