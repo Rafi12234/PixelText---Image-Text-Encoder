@@ -272,7 +272,7 @@ void _compressImageWithProgressIsolate(Map<String, dynamic> args) {
   final sendPort = args['sendPort'] as SendPort;
   try {
     final result = _runCompressionCore(
-      originalBytes: args['imageBytes'] as Uint8List,
+      originalBytes:  args['imageBytes'] as Uint8List,
       originalName: args['fileName'] as String,
       progressPort: sendPort,
     );
