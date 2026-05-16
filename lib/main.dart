@@ -173,7 +173,7 @@ Map<String, dynamic> _runCompressionCore({
       final score =
           (sideRatio * 0.42) +
           (areaRatio * 0.20) +
-          (qualityPower * 0.30) +
+          (qualityPower * 0.3) +
           (utilization * 0.08);
 
       if (score > bestReadableScore) {
