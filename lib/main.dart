@@ -106,7 +106,7 @@ Map<String, dynamic> _runCompressionCore({
       img.contrast(resized, contrast: 110);
       img.convolution(
         resized,
-        filter: const <num>[0, -1, 0, -1, 5, -1, 0, -1, 0],
+        filter: const <num>[0, -1, 0, -1,  5, -1, 0, -1, 0],
         amount: 0.20,
       );
     }
