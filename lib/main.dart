@@ -19,7 +19,7 @@ int _encodedLengthFor(Uint8List bytes, String fileName, String mimeType) {
     
     'version': 1,
     'name': fileName,
-    'mime': mimeType,
+    'mime':  mimeType,
     'data': base64Encode(bytes),
   };
   return jsonEncode(payload).length;
