@@ -47,7 +47,7 @@ Map<String, dynamic> _runCompressionCore({
       
       'compressedBytes': fallback,
       'compressedEncodedLength':
-          _encodedLengthFor(fallback, compressedName, compressedMime),
+          _encodedLengthFor(fallback,  compressedName, compressedMime),
       'compressedName': compressedName,
       'compressedMime': compressedMime,
       'compressedWidth': 1,
