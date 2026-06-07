@@ -52,7 +52,7 @@ Map<String, dynamic> _runCompressionCore({
       'compressedMime': compressedMime,
       'compressedWidth': 1,
       'compressedHeight': 1,
-      'compressedQuality': 1,
+      'compressedQuality':  1,
     };
   }
   final source = img.bakeOrientation(decoded);
